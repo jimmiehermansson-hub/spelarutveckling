@@ -40,18 +40,19 @@ export async function GET(req: NextRequest) {
     }
 
     const userId = claims.sub;
+    const userEmail = (claims.email as string) ?? null;
 
     await prisma.user.upsert({
       where: { id: userId },
       update: {
-        email: (claims.email as string) ?? null,
+        email: userEmail,
         firstName: (claims.first_name as string) ?? null,
         lastName: (claims.last_name as string) ?? null,
         profileImageUrl: (claims.profile_image_url as string) ?? null,
       },
       create: {
         id: userId,
-        email: (claims.email as string) ?? null,
+        email: userEmail,
         firstName: (claims.first_name as string) ?? null,
         lastName: (claims.last_name as string) ?? null,
         profileImageUrl: (claims.profile_image_url as string) ?? null,
@@ -59,6 +60,7 @@ export async function GET(req: NextRequest) {
     });
 
     session.userId = userId;
+    session.userEmail = userEmail ?? undefined;
     session.accessToken = tokens.access_token;
     session.refreshToken = tokens.refresh_token;
     session.expiresAt = claims.exp;

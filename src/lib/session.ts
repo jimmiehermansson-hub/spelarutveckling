@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 
 export interface SessionData {
   userId?: string;
+  userEmail?: string;
   accessToken?: string;
   refreshToken?: string;
   expiresAt?: number;
