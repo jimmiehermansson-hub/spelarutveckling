@@ -29,9 +29,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     const name = typeof body.name === "string" ? body.name.trim() : "";
-
     const direction = body.direction;
     const isActive = typeof body.isActive === "boolean" ? body.isActive : true;
+    const isCore = typeof body.isCore === "boolean" ? body.isCore : false;
 
     const bestValue = Number(body.bestValue);
     const worstValue = Number(body.worstValue);
@@ -106,6 +106,7 @@ export async function POST(request: NextRequest) {
         name,
         direction,
         isActive,
+        isCore,
         bestValue,
         worstValue,
       },

@@ -74,7 +74,7 @@ export default function HomePage() {
   return (
     <main className="min-h-screen p-6">
       <h1 className="text-2xl font-semibold">Spelarutveckling – Dashboard</h1>
-      <div className="mt-3 flex gap-3">
+      <div className="mt-3 flex gap-3 flex-wrap">
         <Link
           href="/measurements/new"
           className="border rounded px-3 py-2 inline-block"
@@ -86,6 +86,12 @@ export default function HomePage() {
           className="border rounded px-3 py-2 inline-block"
         >
           Bulk-inmatning
+        </Link>
+        <Link
+          href="/exercises"
+          className="border rounded px-3 py-2 inline-block"
+        >
+          Hantera övningar
         </Link>
       </div>
       <div className="mt-4 flex flex-wrap items-end gap-3">

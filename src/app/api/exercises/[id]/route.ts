@@ -3,12 +3,16 @@ import { prisma } from "@/lib/prisma";
 
 const allowedDirections = ["HIGHER_BETTER", "LOWER_BETTER"] as const;
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+type RouteContext = {
+  params: Promise<{
+    id: string;
+  }>;
+};
+
+export async function GET(_request: NextRequest, context: RouteContext) {
   try {
-    const { id } = await params;
+    const { id } = await context.params;
+
     const exercise = await prisma.exercise.findUnique({
       where: { id },
     });
@@ -30,17 +34,16 @@ export async function GET(
   }
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
-    const { id } = await params;
+    const { id } = await context.params;
     const body = await request.json();
 
     const name = typeof body.name === "string" ? body.name.trim() : "";
     const direction = body.direction;
     const isActive = typeof body.isActive === "boolean" ? body.isActive : true;
+    const isCore = typeof body.isCore === "boolean" ? body.isCore : false;
+
     const bestValue = Number(body.bestValue);
     const worstValue = Number(body.worstValue);
 
@@ -117,6 +120,7 @@ export async function PATCH(
         name,
         direction,
         isActive,
+        isCore,
         bestValue,
         worstValue,
       },
