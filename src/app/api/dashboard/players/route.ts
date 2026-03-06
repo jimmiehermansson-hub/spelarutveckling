@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { normalizeTo100, trendDirection } from "@/lib/scoring";
+import { median } from "@/lib/stats";
 
 function toDateOnly(d: Date) {
   const x = new Date(d);
@@ -24,19 +25,16 @@ export async function GET(req: Request) {
   const startDate = toDateOnly(new Date(start));
   const endDate = toDateOnly(new Date(end));
 
-  // 1) Hämta core-övningar
   const exercises = await prisma.exercise.findMany({
     where: { isActive: true, isCore: true },
     orderBy: { name: "asc" },
   });
 
-  // 2) Hämta spelare
   const players = await prisma.player.findMany({
     where: { teamId, isActive: true },
     orderBy: { name: "asc" },
   });
 
-  // 3) Hämta alla measurements inom perioden för dessa spelare + core exercises
   const playerIds = players.map((p) => p.id);
   const exerciseIds = exercises.map((e) => e.id);
 
@@ -46,32 +44,31 @@ export async function GET(req: Request) {
       exerciseId: { in: exerciseIds },
       date: { gte: startDate, lte: endDate },
     },
-    orderBy: [{ date: "asc" }],
+    orderBy: [{ playerId: "asc" }, { exerciseId: "asc" }, { date: "asc" }],
   });
 
-  // Grupp per player+exercise
-  const byPE = new Map<string, { date: Date; value: number }[]>();
+  const byPlayerExercise = new Map<string, { date: Date; value: number }[]>();
+
   for (const m of measurements) {
     const key = `${m.playerId}::${m.exerciseId}`;
-    const arr = byPE.get(key) ?? [];
+    const arr = byPlayerExercise.get(key) ?? [];
     arr.push({ date: m.date, value: m.value });
-    byPE.set(key, arr);
+    byPlayerExercise.set(key, arr);
   }
 
-  // Hjälpfunktion: senaste + föregående i perioden
   function latestAndPrev(playerId: string, exerciseId: string) {
     const key = `${playerId}::${exerciseId}`;
-    const arr = byPE.get(key) ?? [];
-    if (arr.length === 0)
-      return { latest: null as null | number, prev: null as null | number };
+    const arr = byPlayerExercise.get(key) ?? [];
+    if (arr.length === 0) {
+      return { latest: null as number | null, prev: null as number | null };
+    }
     const latest = arr[arr.length - 1].value;
-    const prev = arr.length >= 2 ? arr[arr.length - 2].value : null;
+    const prev = arr.length > 1 ? arr[arr.length - 2].value : null;
     return { latest, prev };
   }
 
-  // Hjälpfunktion: score för raw
-  function scoreFor(exId: string, raw: number) {
-    const ex = exercises.find((e) => e.id === exId)!;
+  function scoreFor(exerciseId: string, raw: number) {
+    const ex = exercises.find((e) => e.id === exerciseId)!;
     return normalizeTo100({
       raw,
       best: ex.bestValue,
@@ -81,15 +78,30 @@ export async function GET(req: Request) {
     });
   }
 
-  // Senaste testdatum per spelare (max date i perioden)
-  const lastTestByPlayer = new Map<string, Date | null>();
-  for (const p of players) lastTestByPlayer.set(p.id, null);
-  for (const m of measurements) {
-    const cur = lastTestByPlayer.get(m.playerId);
-    if (!cur || m.date > cur) lastTestByPlayer.set(m.playerId, m.date);
+  // Median per övning, baserat på senaste värde per spelare i perioden
+  const medianByExercise = new Map<string, number | null>();
+
+  for (const ex of exercises) {
+    const latestValues: number[] = [];
+
+    for (const p of players) {
+      const { latest } = latestAndPrev(p.id, ex.id);
+      if (latest != null) latestValues.push(latest);
+    }
+
+    medianByExercise.set(ex.id, median(latestValues));
   }
 
-  // 4) Bygg respons per spelare
+  const lastTestByPlayer = new Map<string, Date | null>();
+  for (const p of players) lastTestByPlayer.set(p.id, null);
+
+  for (const m of measurements) {
+    const current = lastTestByPlayer.get(m.playerId);
+    if (!current || m.date > current) {
+      lastTestByPlayer.set(m.playerId, m.date);
+    }
+  }
+
   const result = players.map((p) => {
     const perExercise = exercises
       .map((ex) => {
@@ -100,12 +112,25 @@ export async function GET(req: Request) {
         const prevScore = prev == null ? null : scoreFor(ex.id, prev);
         const deltaScore = prevScore == null ? null : latestScore - prevScore;
 
+        const exMedian = medianByExercise.get(ex.id);
+        let gapToMedian: number | null = null;
+
+        if (exMedian != null) {
+          if (ex.direction === "HIGHER_BETTER") {
+            gapToMedian = latest - exMedian;
+          } else {
+            gapToMedian = exMedian - latest;
+          }
+        }
+
         return {
           exerciseId: ex.id,
           exercise: ex.name,
           raw: latest,
           score: latestScore,
           deltaScore,
+          medianRaw: exMedian,
+          gapToMedian,
         };
       })
       .filter(Boolean) as Array<{
@@ -114,19 +139,20 @@ export async function GET(req: Request) {
       raw: number;
       score: number;
       deltaScore: number | null;
+      medianRaw: number | null;
+      gapToMedian: number | null;
     }>;
 
-    // total status enligt default: min 3 av 6 core
     const scores = perExercise.map((x) => x.score);
     const sufficient = scores.length >= 3;
     const totalStatus = sufficient
       ? scores.reduce((a, b) => a + b, 0) / scores.length
       : null;
 
-    // previous total: använd prevScore om finns annars latestScore
     const prevScores = perExercise.map((x) =>
       x.deltaScore == null ? x.score : x.score - x.deltaScore,
     );
+
     const totalPrev = sufficient
       ? prevScores.reduce((a, b) => a + b, 0) / prevScores.length
       : null;
@@ -134,20 +160,28 @@ export async function GET(req: Request) {
     const deltaTotal =
       totalStatus != null && totalPrev != null ? totalStatus - totalPrev : 0;
 
-    // strengths & focus
-    const sorted = [...perExercise].sort((a, b) => b.score - a.score);
-    const strengths = sorted.slice(0, 3).map((x) => ({
-      exercise: x.exercise,
-      score: x.score,
-      raw: x.raw,
-    }));
-    const focus = sorted
-      .slice(-3)
-      .reverse()
+    const withMedian = perExercise.filter((x) => x.gapToMedian != null);
+
+    const strengths = [...withMedian]
+      .sort((a, b) => (b.gapToMedian ?? 0) - (a.gapToMedian ?? 0))
+      .slice(0, 2)
       .map((x) => ({
         exercise: x.exercise,
         score: x.score,
         raw: x.raw,
+        medianRaw: x.medianRaw,
+        gapToMedian: x.gapToMedian,
+      }));
+
+    const focus = [...withMedian]
+      .sort((a, b) => (a.gapToMedian ?? 0) - (b.gapToMedian ?? 0))
+      .slice(0, 2)
+      .map((x) => ({
+        exercise: x.exercise,
+        score: x.score,
+        raw: x.raw,
+        medianRaw: x.medianRaw,
+        gapToMedian: x.gapToMedian,
       }));
 
     const lastTestDate = lastTestByPlayer.get(p.id);
@@ -168,8 +202,8 @@ export async function GET(req: Request) {
         direction: trendDirection(deltaTotal),
         delta: Number(deltaTotal.toFixed(1)),
       },
-      strengths: strengths.slice(0, 2),
-      focus: focus.slice(0, 2),
+      strengths,
+      focus,
     };
   });
 

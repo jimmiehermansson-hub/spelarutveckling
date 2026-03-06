@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { normalizeTo100, trendDirection } from "@/lib/scoring";
+import { median } from "@/lib/stats";
 
 function toDateOnly(d: Date) {
   const x = new Date(d);
@@ -67,7 +68,7 @@ export async function GET(req: Request) {
     });
   }
 
-  let teamAvgByExercise = new Map<string, number | null>();
+  let medianByExercise = new Map<string, number | null>();
 
   if (includeTeamAvg) {
     const teamPlayers = await prisma.player.findMany({
@@ -85,25 +86,20 @@ export async function GET(req: Request) {
     });
 
     const latestByPlayerExercise = new Map<string, number>();
+
     for (const m of teamMeasurements) {
       latestByPlayerExercise.set(`${m.playerId}::${m.exerciseId}`, m.value);
     }
 
     for (const ex of exercises) {
       const latestValues: number[] = [];
+
       for (const p of teamPlayers) {
         const raw = latestByPlayerExercise.get(`${p.id}::${ex.id}`);
         if (raw != null) latestValues.push(raw);
       }
 
-      if (latestValues.length === 0) {
-        teamAvgByExercise.set(ex.id, null);
-      } else {
-        const avgRaw =
-          latestValues.reduce((sum, v) => sum + v, 0) / latestValues.length;
-        const avgScore = scoreFor(ex.id, avgRaw);
-        teamAvgByExercise.set(ex.id, avgScore);
-      }
+      medianByExercise.set(ex.id, median(latestValues));
     }
   }
 
@@ -117,13 +113,27 @@ export async function GET(req: Request) {
     const deltaScore =
       latestScore != null && prevScore != null ? latestScore - prevScore : null;
 
+    const medianRaw = includeTeamAvg
+      ? (medianByExercise.get(ex.id) ?? null)
+      : null;
+
+    let gapToMedian: number | null = null;
+    if (latest != null && medianRaw != null) {
+      if (ex.direction === "HIGHER_BETTER") {
+        gapToMedian = latest - medianRaw;
+      } else {
+        gapToMedian = medianRaw - latest;
+      }
+    }
+
     return {
       exerciseId: ex.id,
       exercise: ex.name,
       latestRaw: latest,
       latestScore,
       deltaScore,
-      teamScore: includeTeamAvg ? (teamAvgByExercise.get(ex.id) ?? null) : null,
+      medianRaw,
+      gapToMedian,
     };
   });
 
@@ -161,8 +171,8 @@ export async function GET(req: Request) {
       : 0;
 
   const ranked = table
-    .filter((x) => x.latestScore != null)
-    .sort((a, b) => (b.latestScore ?? 0) - (a.latestScore ?? 0));
+    .filter((x) => x.latestScore != null && x.gapToMedian != null)
+    .sort((a, b) => (b.gapToMedian ?? 0) - (a.gapToMedian ?? 0));
 
   const strengths = ranked.slice(0, 3);
   const focus = [...ranked].reverse().slice(0, 3);
@@ -170,7 +180,7 @@ export async function GET(req: Request) {
   const radar = table.map((x) => ({
     exercise: x.exercise,
     playerScore: x.latestScore,
-    teamScore: x.teamScore,
+    teamScore: x.medianRaw,
   }));
 
   return NextResponse.json({

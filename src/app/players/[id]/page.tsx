@@ -297,7 +297,7 @@ export default function PlayerReportPage({
                     <th>Senaste råvärde</th>
                     <th>Score</th>
                     <th>Delta</th>
-                    <th>Lagsnitt</th>
+                    <th>Median</th>
                   </tr>
                 </thead>
                 <tbody>
