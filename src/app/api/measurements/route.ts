@@ -36,6 +36,7 @@ export async function POST(req: Request) {
     const dateOnly = new Date(date);
     dateOnly.setHours(0, 0, 0, 0);
 
+    // @ts-ignore
     const measurement = await prisma.measurement.upsert({
       where: {
         playerId_exerciseId_date: {
@@ -50,6 +51,7 @@ export async function POST(req: Request) {
         createdBy: createdBy ?? "coach",
       },
       create: {
+        id: crypto.randomUUID(),
         playerId,
         exerciseId,
         date: dateOnly,

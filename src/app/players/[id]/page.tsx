@@ -235,7 +235,10 @@ export default function PlayerReportPage({
     <main className="min-h-screen p-6 print:p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <Link href="/" className="text-blue-600 hover:underline mb-2 block print:hidden">
+          <Link
+            href="/"
+            className="text-blue-600 hover:underline mb-2 block print:hidden"
+          >
             ← Till Dashboard
           </Link>
           <h1 className="text-2xl font-semibold">Spelarrapport</h1>
@@ -314,7 +317,9 @@ export default function PlayerReportPage({
                   </div>
                 ))}
                 {data.strengths.length === 0 && (
-                  <p className="text-sm opacity-50 italic">Inga specifika styrkor noterade.</p>
+                  <p className="text-sm opacity-50 italic">
+                    Inga specifika styrkor noterade.
+                  </p>
                 )}
               </div>
             </div>
@@ -332,7 +337,9 @@ export default function PlayerReportPage({
                   </div>
                 ))}
                 {data.focus.length === 0 && (
-                  <p className="text-sm opacity-50 italic">Inga specifika fokusområden noterade.</p>
+                  <p className="text-sm opacity-50 italic">
+                    Inga specifika fokusområden noterade.
+                  </p>
                 )}
               </div>
             </div>
@@ -344,12 +351,16 @@ export default function PlayerReportPage({
             <div className="mb-4">
               <label className="block text-sm mb-1">Välj övning</label>
               <select
-                className="border rounded px-3 py-2 w-full max-w-md bg-white"
+                className="w-full max-w-md rounded border border-gray-300 bg-transparent px-3 py-2 text-sm text-inherit outline-none transition-colors focus:border-gray-500"
                 value={selectedExerciseId}
                 onChange={(e) => setSelectedExerciseId(e.target.value)}
               >
                 {data.table.map((row) => (
-                  <option key={row.exerciseId} value={row.exerciseId}>
+                  <option
+                    key={row.exerciseId}
+                    value={row.exerciseId}
+                    className="bg-white text-black"
+                  >
                     {row.exercise}
                   </option>
                 ))}
@@ -368,16 +379,32 @@ export default function PlayerReportPage({
                 </div>
 
                 <div className="h-72 w-full min-h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={300}>
+                  <ResponsiveContainer
+                    width="100%"
+                    height="100%"
+                    minWidth={0}
+                    minHeight={300}
+                  >
                     <LineChart data={trendData}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="date" 
-                        tickFormatter={(str) => new Date(str).toLocaleDateString("sv-SE", { month: "short", day: "numeric" })}
+                      <XAxis
+                        dataKey="date"
+                        tickFormatter={(str) =>
+                          new Date(str).toLocaleDateString("sv-SE", {
+                            month: "short",
+                            day: "numeric",
+                          })
+                        }
                       />
                       <YAxis />
                       <Tooltip
-                        labelFormatter={(label) => new Date(label).toLocaleDateString("sv-SE", { year: "numeric", month: "long", day: "numeric" })}
+                        labelFormatter={(label) =>
+                          new Date(label).toLocaleDateString("sv-SE", {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          })
+                        }
                         formatter={(value) => {
                           const unit = trendData[0]?.unit;
                           return unit
@@ -418,16 +445,27 @@ export default function PlayerReportPage({
                   </thead>
                   <tbody>
                     {data.table.map((row) => (
-                      <tr key={row.exerciseId} className="border-b hover:bg-gray-50 transition-colors">
-                        <td className="py-2 pr-4 font-medium">{row.exercise}</td>
-                        <td className="px-2 text-right">{row.latestRaw ?? "-"}</td>
-                        <td className="px-2 text-right">{row.latestScore ?? "-"}</td>
+                      <tr
+                        key={row.exerciseId}
+                        className="border-b hover:bg-gray-50 transition-colors"
+                      >
+                        <td className="py-2 pr-4 font-medium">
+                          {row.exercise}
+                        </td>
+                        <td className="px-2 text-right">
+                          {row.latestRaw ?? "-"}
+                        </td>
+                        <td className="px-2 text-right">
+                          {row.latestScore ?? "-"}
+                        </td>
                         <td className="px-2 text-right">
                           {row.deltaScore == null
                             ? "-"
                             : `${row.deltaScore >= 0 ? "+" : ""}${row.deltaScore}`}
                         </td>
-                        <td className="pl-2 text-right">{row.teamScore ?? "-"}</td>
+                        <td className="pl-2 text-right">
+                          {row.teamScore ?? "-"}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

@@ -1,38 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { randomUUID } from "crypto";
 
 const allowedDirections = ["HIGHER_BETTER", "LOWER_BETTER"] as const;
 
-export async function GET(request: NextRequest) {
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const { searchParams } = new URL(request.url);
-    const includeInactive = searchParams.get("includeInactive") === "true";
-
-    const exercises = await prisma.exercise.findMany({
-      where: includeInactive ? {} : { isActive: true },
-      orderBy: { name: "asc" },
+    const { id } = await params;
+    const exercise = await prisma.exercise.findUnique({
+      where: { id },
     });
 
-    return NextResponse.json(exercises);
+    if (!exercise) {
+      return NextResponse.json(
+        { error: "Övningen hittades inte." },
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json(exercise);
   } catch (error) {
-    console.error("GET /api/exercises failed:", error);
+    console.error("GET /api/exercises/[id] failed:", error);
     return NextResponse.json(
-      { error: "Kunde inte hämta övningar." },
+      { error: "Kunde inte hämta övningen." },
       { status: 500 },
     );
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
+    const { id } = await params;
     const body = await request.json();
 
     const name = typeof body.name === "string" ? body.name.trim() : "";
-
     const direction = body.direction;
     const isActive = typeof body.isActive === "boolean" ? body.isActive : true;
-
     const bestValue = Number(body.bestValue);
     const worstValue = Number(body.worstValue);
 
@@ -90,6 +98,9 @@ export async function POST(request: NextRequest) {
           equals: name,
           mode: "insensitive",
         },
+        NOT: {
+          id,
+        },
       },
     });
 
@@ -100,9 +111,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const exercise = await prisma.exercise.create({
+    const updatedExercise = await prisma.exercise.update({
+      where: { id },
       data: {
-        id: randomUUID(),
         name,
         direction,
         isActive,
@@ -111,11 +122,11 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(exercise, { status: 201 });
+    return NextResponse.json(updatedExercise);
   } catch (error) {
-    console.error("POST /api/exercises failed:", error);
+    console.error("PATCH /api/exercises/[id] failed:", error);
     return NextResponse.json(
-      { error: "Kunde inte skapa övning." },
+      { error: "Kunde inte uppdatera övningen." },
       { status: 500 },
     );
   }

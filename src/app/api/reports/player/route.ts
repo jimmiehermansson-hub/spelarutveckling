@@ -29,7 +29,7 @@ export async function GET(req: Request) {
 
   const player = await prisma.player.findUnique({
     where: { id: playerId },
-    include: { team: true },
+    include: { Team: true },
   });
 
   if (!player) {
@@ -194,7 +194,7 @@ export async function GET(req: Request) {
       name: player.name,
       birthYear: player.birthYear,
       primaryPosition: player.primaryPosition,
-      team: player.team.name,
+      team: player.Team.name,
       imageUrl: player.imageUrl,
     },
     totalStatus,

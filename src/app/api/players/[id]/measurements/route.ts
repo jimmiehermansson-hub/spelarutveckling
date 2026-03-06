@@ -43,7 +43,7 @@ export async function GET(
         date: true,
         value: true,
         exerciseId: true,
-        exercise: {
+        Exercise: {
           select: {
             name: true,
             unit: true,
@@ -57,8 +57,8 @@ export async function GET(
       date: m.date.toISOString().slice(0, 10),
       value: m.value,
       exerciseId: m.exerciseId,
-      exerciseName: m.exercise.name,
-      unit: m.exercise.unit,
+      exerciseName: m.Exercise.name,
+      unit: m.Exercise.unit,
     }));
 
     return NextResponse.json(result);
