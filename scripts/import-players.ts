@@ -1,7 +1,17 @@
 import { PrismaClient } from "@prisma/client";
 import { randomUUID } from "crypto";
+import fs from "fs/promises";
+import path from "path";
+import { parse } from "csv-parse/sync";
 
 const prisma = new PrismaClient();
+
+type CsvPlayerRow = {
+  name: string;
+  birthYear?: string;
+  primaryPosition?: string;
+  isActive?: string;
+};
 
 async function main() {
   const team = await prisma.team.findUnique({
@@ -12,71 +22,109 @@ async function main() {
     throw new Error('Team "Vikingstad P16/17" hittades inte.');
   }
 
-  const existingPlayers = await prisma.player.findMany({
-    where: { teamId: team.id },
-    select: { id: true },
+  const csvPath = path.join(process.cwd(), "data", "players.csv");
+  const fileContent = await fs.readFile(csvPath, "utf8");
+
+  const rows = parse(fileContent, {
+    columns: true,
+    skip_empty_lines: true,
+    trim: true,
+  }) as CsvPlayerRow[];
+
+  if (rows.length === 0) {
+    throw new Error("CSV-filen är tom.");
+  }
+
+  const playersData = rows.map((row, index) => {
+    const name = row.name?.trim();
+
+    if (!name) {
+      throw new Error(`Rad ${index + 2}: name saknas.`);
+    }
+
+    const birthYear =
+      row.birthYear && row.birthYear.trim() !== ""
+        ? Number(row.birthYear)
+        : null;
+
+    if (birthYear !== null && Number.isNaN(birthYear)) {
+      throw new Error(`Rad ${index + 2}: birthYear är ogiltigt.`);
+    }
+
+    const primaryPosition =
+      row.primaryPosition && row.primaryPosition.trim() !== ""
+        ? row.primaryPosition.trim()
+        : null;
+
+    const isActive =
+      row.isActive && row.isActive.trim() !== ""
+        ? row.isActive.trim().toLowerCase() === "true"
+        : true;
+
+    return {
+      name,
+      birthYear,
+      primaryPosition,
+      isActive,
+    };
   });
 
-  const existingPlayerIds = existingPlayers.map((p) => p.id);
+  const duplicateNamesInCsv = playersData
+    .map((p) => p.name.toLowerCase())
+    .filter((name, index, arr) => arr.indexOf(name) !== index);
 
-  if (existingPlayerIds.length > 0) {
-    await prisma.measurement.deleteMany({
-      where: {
-        playerId: { in: existingPlayerIds },
-      },
-    });
-
-    await prisma.player.deleteMany({
-      where: {
-        teamId: team.id,
-      },
-    });
+  if (duplicateNamesInCsv.length > 0) {
+    throw new Error(
+      `Dubbletter i CSV: ${[...new Set(duplicateNamesInCsv)].join(", ")}`,
+    );
   }
 
-  const playersData = [
-    { name: "Adrian Frumerie", birthYear: 2016, primaryPosition: "UTE" },
-    { name: "Alvar Holmér", birthYear: 2016, primaryPosition: "UTE" },
-    { name: "Anton Rosén", birthYear: 2016, primaryPosition: "UTE" },
-    { name: "Arvid Svärd", birthYear: 2016, primaryPosition: "UTE" },
-    { name: "Bosse Wirsén", birthYear: 2017, primaryPosition: "UTE" },
-    { name: "Charlie Algborn-Kron", birthYear: 2016, primaryPosition: "UTE" },
-    { name: "Edvin Logander", birthYear: 2016, primaryPosition: "UTE" },
-    { name: "Elvin Gunnarsson", birthYear: 2017, primaryPosition: "UTE" },
-    { name: "Emil Ljunggren", birthYear: 2016, primaryPosition: "UTE" },
-    { name: "Emil Löfvenborg", birthYear: 2016, primaryPosition: "UTE" },
-    { name: "Henry Durefelt", birthYear: 2017, primaryPosition: "UTE" },
-    { name: "Hjalmar Norlén", birthYear: 2017, primaryPosition: "UTE" },
-    { name: "Isak Arvén", birthYear: 2016, primaryPosition: "UTE" },
-    { name: "Jonah Hermansson", birthYear: 2016, primaryPosition: "UTE" },
-    { name: "León Wickström", birthYear: 2017, primaryPosition: "UTE" },
-    { name: "Lion Green", birthYear: 2017, primaryPosition: "UTE" },
-    { name: "Ludvig Fredriksson", birthYear: 2017, primaryPosition: "UTE" },
-    { name: "Ludwig Algborn-Kron", birthYear: 2016, primaryPosition: "UTE" },
-    { name: "Milton Malmgren", birthYear: 2016, primaryPosition: "UTE" },
-    { name: "Noel Svenrud", birthYear: 2017, primaryPosition: "UTE" },
-    { name: "Oliver Brammer", birthYear: 2017, primaryPosition: "UTE" },
-    { name: "Olle Wass", birthYear: 2017, primaryPosition: "UTE" },
-    { name: "Oscar Angvik", birthYear: 2016, primaryPosition: "UTE" },
-    { name: "Pontus Öresjö", birthYear: 2016, primaryPosition: "UTE" },
-    { name: "Ryan Al Darzi", birthYear: 2017, primaryPosition: "UTE" },
-    { name: "Tage Wiklund", birthYear: 2017, primaryPosition: "UTE" },
-  ];
+  let createdCount = 0;
+  let updatedCount = 0;
 
   for (const p of playersData) {
-    await prisma.player.create({
-      data: {
-        id: randomUUID(),
+    const existingPlayer = await prisma.player.findFirst({
+      where: {
         teamId: team.id,
-        name: p.name,
-        birthYear: p.birthYear,
-        primaryPosition: p.primaryPosition,
-        isActive: true,
-        updatedAt: new Date(),
+        name: {
+          equals: p.name,
+          mode: "insensitive",
+        },
       },
     });
+
+    if (existingPlayer) {
+      await prisma.player.update({
+        where: { id: existingPlayer.id },
+        data: {
+          birthYear: p.birthYear,
+          primaryPosition: p.primaryPosition,
+          isActive: p.isActive,
+          updatedAt: new Date(),
+        },
+      });
+
+      updatedCount++;
+    } else {
+      await prisma.player.create({
+        data: {
+          id: randomUUID(),
+          teamId: team.id,
+          name: p.name,
+          birthYear: p.birthYear,
+          primaryPosition: p.primaryPosition,
+          isActive: p.isActive,
+          updatedAt: new Date(),
+        },
+      });
+
+      createdCount++;
+    }
   }
 
-  console.log("✅ Spelare importerade");
+  console.log(
+    `✅ Import klar. Skapade ${createdCount} nya spelare och uppdaterade ${updatedCount} befintliga.`,
+  );
 }
 
 main()
