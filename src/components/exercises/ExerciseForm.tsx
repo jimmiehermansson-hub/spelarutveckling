@@ -40,6 +40,7 @@ export default function ExerciseForm({
   );
 
   const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -113,8 +114,10 @@ export default function ExerciseForm({
         return;
       }
 
-      router.push("/exercises");
-      router.refresh();
+      setSaved(true);
+      setTimeout(() => {
+        router.push("/exercises");
+      }, 800);
     } catch {
       setError("Kunde inte spara övningen.");
     } finally {
@@ -208,11 +211,16 @@ export default function ExerciseForm({
       </div>
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {saved ? (
+        <p className="text-sm text-green-700 font-medium">
+          ✓ {mode === "create" ? "Övningen skapades!" : "Ändringarna sparades!"} Skickar dig tillbaka…
+        </p>
+      ) : null}
 
       <div className="flex gap-3">
         <button
           type="submit"
-          disabled={isSubmitting}
+          disabled={isSubmitting || saved}
           className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
         >
           {isSubmitting
@@ -224,8 +232,9 @@ export default function ExerciseForm({
 
         <button
           type="button"
+          disabled={saved}
           onClick={() => router.push("/exercises")}
-          className="rounded border px-4 py-2"
+          className="rounded border px-4 py-2 disabled:opacity-50"
         >
           Avbryt
         </button>
