@@ -17,6 +17,9 @@ const PUBLIC_PATHS = [
 // The /unauthorized page is shown to logged-in users who are not on the list.
 const ALLOWLIST_EXEMPT_PATHS = ["/unauthorized"];
 
+// User-agent substrings used by Replit's deployment healthcheck probes.
+const HEALTHCHECK_USER_AGENTS = ["Go-http-client", "GoogleHC", "kube-probe"];
+
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
@@ -26,6 +29,13 @@ export async function proxy(req: NextRequest) {
   }
   if (pathname.startsWith("/_next") || pathname.startsWith("/favicon")) {
     return NextResponse.next();
+  }
+
+  // 2. Let Replit deployment healthcheck probes through without auth.
+  //    These hit "/" during the Promote step to verify the server is up.
+  const ua = req.headers.get("user-agent") ?? "";
+  if (HEALTHCHECK_USER_AGENTS.some((s) => ua.includes(s))) {
+    return new NextResponse("ok", { status: 200 });
   }
 
   const res = NextResponse.next();
