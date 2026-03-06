@@ -1,14 +1,75 @@
-generator client {
-  provider = "prisma-client-js"
-}
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id    Int     @id @default(autoincrement())
-  email String  @unique
-  name  String?
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum ExerciseDirection {
+  HIGHER_BETTER
+  LOWER_BETTER
+}
+
+model Team {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  players   Player[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Player {
+  id              String        @id @default(uuid())
+  teamId          String
+  name            String
+  birthYear       Int?
+  primaryPosition String?
+  isActive        Boolean       @default(true)
+  imageUrl        String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  team            Team          @relation(fields: [teamId], references: [id])
+  measurements    Measurement[]
+
+  @@unique([teamId, name])
+  @@index([teamId, isActive])
+}
+
+model Exercise {
+  id           String            @id @default(uuid())
+  name         String            @unique
+  category     String?
+  unit         String?
+  direction    ExerciseDirection
+  bestValue    Float
+  worstValue   Float
+  roundingStep Float             @default(0.5)
+  isActive     Boolean           @default(true)
+  isCore       Boolean           @default(false)
+
+  measurements Measurement[]
+
+  @@index([isActive])
+  @@index([isCore])
+}
+
+model Measurement {
+  id         String   @id @default(uuid())
+  playerId   String
+  exerciseId String
+  date       DateTime @db.Date
+  value      Float
+  source     String?
+  createdBy  String?
+  createdAt  DateTime @default(now())
+
+  player     Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  exercise   Exercise @relation(fields: [exerciseId], references: [id])
+
+  @@unique([playerId, exerciseId, date])
+  @@index([playerId, date])
+  @@index([exerciseId, date])
 }
