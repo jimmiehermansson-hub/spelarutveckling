@@ -44,6 +44,15 @@ type ReportResponse = {
   }[];
 };
 
+type TrendPoint = {
+  id: string;
+  date: string;
+  value: number;
+  exerciseId: string;
+  exerciseName: string;
+  unit?: string | null;
+};
+
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -152,6 +161,8 @@ export default function PlayerReportPage({
   const [data, setData] = useState<ReportResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedExerciseId, setSelectedExerciseId] = useState<string>("");
+  const [trendData, setTrendData] = useState<TrendPoint[]>([]);
 
   useEffect(() => {
     params.then((p) => setPlayerId(p.id));
@@ -177,6 +188,29 @@ export default function PlayerReportPage({
       }
     })();
   }, [playerId, start, end]);
+
+  useEffect(() => {
+    if (data?.table?.length && !selectedExerciseId) {
+      setSelectedExerciseId(data.table[0].exerciseId);
+    }
+  }, [data, selectedExerciseId]);
+
+  useEffect(() => {
+    if (!playerId || !selectedExerciseId) return;
+
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/players/${playerId}/measurements?exerciseId=${selectedExerciseId}`,
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        setTrendData(json);
+      } catch (e: any) {
+        setError(e?.message ?? "Kunde inte ladda trenddata.");
+      }
+    })();
+  }, [playerId, selectedExerciseId]);
 
   const trendSymbol = useMemo(() => {
     if (!data) return "→";
@@ -281,6 +315,46 @@ export default function PlayerReportPage({
                 ))}
               </div>
             </div>
+          </div>
+
+          <div className="mt-6 border rounded-xl p-4">
+            <h3 className="font-semibold mb-3">Trend över tid</h3>
+
+            <div className="mb-4">
+              <label className="block text-sm mb-1">Välj övning</label>
+              <select
+                className="border rounded px-3 py-2 w-full max-w-md"
+                value={selectedExerciseId}
+                onChange={(e) => setSelectedExerciseId(e.target.value)}
+              >
+                {data.table.map((row) => (
+                  <option key={row.exerciseId} value={row.exerciseId}>
+                    {row.exercise}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {trendData.length === 0 ? (
+              <p className="text-sm opacity-70">
+                Ingen historik finns ännu för vald övning.
+              </p>
+            ) : (
+              <div className="space-y-2 text-sm">
+                {trendData.map((point) => (
+                  <div
+                    key={point.id}
+                    className="flex justify-between border-b pb-2"
+                  >
+                    <span>{point.date}</span>
+                    <span>
+                      {point.value}
+                      {point.unit ? ` ${point.unit}` : ""}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="mt-6">
