@@ -74,7 +74,14 @@ export default function HomePage() {
   return (
     <main className="min-h-screen p-6">
       <h1 className="text-2xl font-semibold">Spelarutveckling – Dashboard</h1>
-
+      <div className="mt-3">
+        <Link
+          href="/measurements/new"
+          className="border rounded px-3 py-2 inline-block"
+        >
+          Registrera ny mätning
+        </Link>
+      </div>
       <div className="mt-4 flex flex-wrap items-end gap-3">
         <div>
           <label className="block text-sm opacity-80">Period start</label>

@@ -142,17 +142,18 @@ function RadarMini({
   );
 }
 
-export default function PlayerReportPage({
+export default function PlayerPrintPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const [playerId, setPlayerId] = useState<string | null>(null);
-  const [start, setStart] = useState(daysAgoISO(90));
-  const [end, setEnd] = useState(todayISO());
   const [data, setData] = useState<ReportResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const start = daysAgoISO(90);
+  const end = todayISO();
 
   useEffect(() => {
     params.then((p) => setPlayerId(p.id));
@@ -187,81 +188,59 @@ export default function PlayerReportPage({
   }, [data]);
 
   return (
-    <main className="min-h-screen p-6 print:p-4">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Spelarrapport</h1>
-          {data && (
-            <>
-              <div className="mt-2 text-lg font-medium">{data.player.name}</div>
-              <div className="text-sm opacity-70">
-                {data.player.team} • {data.player.primaryPosition ?? "-"} •{" "}
-                {data.player.birthYear ?? "-"}
-              </div>
-            </>
-          )}
-        </div>
+    <main className="min-h-screen bg-white text-black p-6 print:p-4">
+      <div className="print:hidden flex items-center justify-between mb-6">
+        <Link
+          href={`/players/${playerId ?? ""}`}
+          className="text-blue-600 underline"
+        >
+          ← Tillbaka till spelarsidan
+        </Link>
 
-        <div className="print:hidden flex gap-2">
-          <Link
-            href={`/players/${playerId}/print`}
-            className="border rounded px-3 py-1 inline-flex items-center"
-          >
-            Öppna utskriftsvy
-          </Link>
-
-          <button
-            className="border rounded px-3 py-1"
-            onClick={() => window.print()}
-          >
-            Skriv ut / Spara PDF
-          </button>
-        </div>
+        <button
+          className="border rounded px-4 py-2"
+          onClick={() => window.print()}
+        >
+          Skriv ut / Spara PDF
+        </button>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-end gap-3 print:hidden">
-        <div>
-          <label className="block text-sm opacity-80">Period start</label>
-          <input
-            className="border rounded px-2 py-1"
-            type="date"
-            value={start}
-            onChange={(e) => setStart(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="block text-sm opacity-80">Period slut</label>
-          <input
-            className="border rounded px-2 py-1"
-            type="date"
-            value={end}
-            onChange={(e) => setEnd(e.target.value)}
-          />
-        </div>
-      </div>
-
-      {loading && <p className="mt-4">Laddar rapport…</p>}
-      {error && <p className="mt-4 text-red-600">Fel: {error}</p>}
+      {loading && <p>Laddar rapport…</p>}
+      {error && <p className="text-red-600">Fel: {error}</p>}
 
       {data && (
-        <>
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="max-w-5xl mx-auto">
+          <header className="mb-6 border-b pb-4">
+            <h1 className="text-3xl font-bold">Spelarrapport</h1>
+            <div className="mt-2 text-lg font-medium">{data.player.name}</div>
+            <div className="text-sm opacity-70">
+              {data.player.team} • {data.player.primaryPosition ?? "-"} •{" "}
+              {data.player.birthYear ?? "-"}
+            </div>
+            <div className="mt-2 text-sm opacity-70">
+              Period: {data.meta.start} – {data.meta.end}
+            </div>
+          </header>
+
+          <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div className="border rounded-xl p-4">
               <div className="text-sm opacity-70">Total status</div>
-              <div className="text-3xl font-bold mt-1">
+              <div className="text-4xl font-bold mt-1">
                 {data.totalStatus ?? "–"}
               </div>
               <div className="mt-2">
                 Trend: {trendSymbol} ({data.trend.delta >= 0 ? "+" : ""}
                 {data.trend.delta})
               </div>
-              <div className="mt-2 text-sm opacity-70">
-                Period: {data.meta.start} – {data.meta.end}
-              </div>
+              {data.insufficientData && (
+                <div className="mt-2 text-sm text-red-600">
+                  Begränsat underlag
+                </div>
+              )}
             </div>
 
             <div className="border rounded-xl p-4">
-              <h3 className="font-semibold mb-2">Styrkor</h3>
+              <h2 className="font-semibold mb-2">Styrkor</h2>
               <div className="space-y-2">
                 {data.strengths.map((s) => (
                   <div key={s.exercise}>
@@ -276,7 +255,7 @@ export default function PlayerReportPage({
             </div>
 
             <div className="border rounded-xl p-4">
-              <h3 className="font-semibold mb-2">Fokusområden</h3>
+              <h2 className="font-semibold mb-2">Fokusområden</h2>
               <div className="space-y-2">
                 {data.focus.map((f) => (
                   <div key={f.exercise}>
@@ -289,16 +268,16 @@ export default function PlayerReportPage({
                 ))}
               </div>
             </div>
-          </div>
+          </section>
 
-          <div className="mt-6">
+          <section className="mb-6">
             <RadarMini data={data.radar} />
-          </div>
+          </section>
 
-          <div className="mt-6 border rounded-xl p-4">
-            <h3 className="font-semibold mb-3">Detaljer per övning</h3>
+          <section className="border rounded-xl p-4">
+            <h2 className="font-semibold mb-3">Detaljer per övning</h2>
             <div className="overflow-x-auto">
-              <table className="min-w-[800px] border-collapse">
+              <table className="min-w-[800px] border-collapse w-full">
                 <thead>
                   <tr className="text-left border-b">
                     <th className="py-2">Övning</th>
@@ -325,8 +304,12 @@ export default function PlayerReportPage({
                 </tbody>
               </table>
             </div>
-          </div>
-        </>
+          </section>
+
+          <footer className="mt-6 text-xs opacity-60">
+            Genererad: {new Date(data.meta.generatedAt).toLocaleString("sv-SE")}
+          </footer>
+        </div>
       )}
     </main>
   );
