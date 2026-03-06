@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getIronSession } from "iron-session";
 import type { SessionData } from "@/lib/session";
+import { getExternalOrigin } from "@/lib/request-url";
 
 const PUBLIC_PATHS = [
   "/api/login",
@@ -27,7 +28,7 @@ export async function proxy(req: NextRequest) {
     password: process.env.SESSION_SECRET!,
     cookieName: "spelarutveckling_session",
     cookieOptions: {
-      secure: process.env.NODE_ENV === "production",
+      secure: true,
       httpOnly: true,
       sameSite: "lax",
       maxAge: 60 * 60 * 24 * 7,
@@ -35,7 +36,10 @@ export async function proxy(req: NextRequest) {
   });
 
   if (!session.userId) {
-    const loginUrl = new URL("/api/login", req.url);
+    // Build the redirect using the public origin, not req.url (which is
+    // the internal 0.0.0.0:3000 address).
+    const origin = getExternalOrigin(req);
+    const loginUrl = new URL("/api/login", origin);
     loginUrl.searchParams.set("returnTo", pathname);
     return NextResponse.redirect(loginUrl);
   }

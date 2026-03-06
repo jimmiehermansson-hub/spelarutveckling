@@ -3,6 +3,7 @@ import * as client from "openid-client";
 import { getOidcConfig } from "@/lib/oidc";
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { getExternalOrigin, externalUrl } from "@/lib/request-url";
 
 export async function GET(req: NextRequest) {
   try {
@@ -14,18 +15,28 @@ export async function GET(req: NextRequest) {
     const returnTo = session.returnTo ?? "/";
 
     if (!codeVerifier || !expectedState) {
-      return NextResponse.redirect(new URL("/api/login", req.url));
+      return NextResponse.redirect(externalUrl(req, "/api/login"));
     }
+
+    // openid-client needs the full callback URL including the auth server's
+    // query params (code=, state=).  req.url is the internal 0.0.0.0 address
+    // so we rebuild it using the public origin + the original path+query.
+    const origin = getExternalOrigin(req);
+    const internalUrl = new URL(req.url);
+    const publicCallbackUrl = new URL(
+      `${internalUrl.pathname}${internalUrl.search}`,
+      origin
+    );
 
     const tokens = await client.authorizationCodeGrant(
       config,
-      new URL(req.url),
+      publicCallbackUrl,
       { pkceCodeVerifier: codeVerifier, expectedState }
     );
 
     const claims = tokens.claims();
     if (!claims) {
-      return NextResponse.redirect(new URL("/api/login", req.url));
+      return NextResponse.redirect(externalUrl(req, "/api/login"));
     }
 
     const userId = claims.sub;
@@ -56,9 +67,10 @@ export async function GET(req: NextRequest) {
     session.returnTo = undefined;
     await session.save();
 
-    return NextResponse.redirect(new URL(returnTo, req.url));
+    // returnTo is always a path (e.g. "/") — anchor it to the public origin.
+    return NextResponse.redirect(externalUrl(req, returnTo));
   } catch (err) {
     console.error("OAuth callback error:", err);
-    return NextResponse.redirect(new URL("/api/login", req.url));
+    return NextResponse.redirect(externalUrl(req, "/api/login"));
   }
 }
