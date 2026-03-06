@@ -5,8 +5,12 @@ import { prisma } from "@/lib/prisma";
 const MeasurementSchema = z.object({
   playerId: z.string().min(1),
   exerciseId: z.string().min(1),
-  date: z.string().min(1),
-  value: z.coerce.number(),
+  date: z.string().refine((val) => !Number.isNaN(Date.parse(val)), {
+    message: "Invalid date",
+  }),
+  value: z.coerce.number().refine((val) => Number.isFinite(val), {
+    message: "Invalid value",
+  }),
   source: z.string().optional(),
   createdBy: z.string().optional(),
 });
