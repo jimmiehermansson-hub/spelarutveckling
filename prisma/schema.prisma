@@ -1,45 +1,14 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
-
-enum ExerciseDirection {
-  HIGHER_BETTER
-  LOWER_BETTER
-}
-
-model Team {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  players   Player[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Player {
-  id              String        @id @default(uuid())
-  teamId          String
-  name            String
-  birthYear       Int?
-  primaryPosition String?
-  isActive        Boolean       @default(true)
-  imageUrl        String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-
-  team            Team          @relation(fields: [teamId], references: [id])
-  measurements    Measurement[]
-
-  @@unique([teamId, name])
-  @@index([teamId, isActive])
-}
-
 model Exercise {
-  id           String            @id @default(uuid())
+  id           String            @id
   name         String            @unique
   category     String?
   unit         String?
@@ -49,15 +18,14 @@ model Exercise {
   roundingStep Float             @default(0.5)
   isActive     Boolean           @default(true)
   isCore       Boolean           @default(false)
-
-  measurements Measurement[]
+  Measurement  Measurement[]
 
   @@index([isActive])
   @@index([isCore])
 }
 
 model Measurement {
-  id         String   @id @default(uuid())
+  id         String   @id
   playerId   String
   exerciseId String
   date       DateTime @db.Date
@@ -65,11 +33,40 @@ model Measurement {
   source     String?
   createdBy  String?
   createdAt  DateTime @default(now())
-
-  player     Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
-  exercise   Exercise @relation(fields: [exerciseId], references: [id])
+  Exercise   Exercise @relation(fields: [exerciseId], references: [id])
+  Player     Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
   @@unique([playerId, exerciseId, date])
-  @@index([playerId, date])
   @@index([exerciseId, date])
+  @@index([playerId, date])
+}
+
+model Player {
+  id              String        @id
+  teamId          String
+  name            String
+  birthYear       Int?
+  primaryPosition String?
+  isActive        Boolean       @default(true)
+  imageUrl        String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime
+  Measurement     Measurement[]
+  Team            Team          @relation(fields: [teamId], references: [id])
+
+  @@unique([teamId, name])
+  @@index([teamId, isActive])
+}
+
+model Team {
+  id        String   @id
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  Player    Player[]
+}
+
+enum ExerciseDirection {
+  HIGHER_BETTER
+  LOWER_BETTER
 }

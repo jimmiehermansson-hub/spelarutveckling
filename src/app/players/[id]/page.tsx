@@ -1,6 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
 type ReportResponse = {
   meta: { generatedAt: string; start: string; end: string };
@@ -91,50 +101,52 @@ function RadarMini({
   return (
     <div className="border rounded-xl p-4">
       <h3 className="font-semibold mb-3">Radar (6 core-övningar)</h3>
-      <svg width="220" height="220" viewBox="0 0 220 220">
-        {[25, 50, 75, 100].map((ring) => (
-          <circle
-            key={ring}
-            cx="110"
-            cy="110"
-            r={(ring / 100) * 90}
-            fill="none"
-            stroke="#d1d5db"
-            strokeWidth="1"
-          />
-        ))}
-
-        {data.map((d, i) => {
-          const angle = (Math.PI * 2 * i) / data.length - Math.PI / 2;
-          const x = 110 + Math.cos(angle) * 90;
-          const y = 110 + Math.sin(angle) * 90;
-          return (
-            <line
-              key={d.exercise}
-              x1="110"
-              y1="110"
-              x2={x}
-              y2={y}
+      <div className="flex justify-center">
+        <svg width="220" height="220" viewBox="0 0 220 220">
+          {[25, 50, 75, 100].map((ring) => (
+            <circle
+              key={ring}
+              cx="110"
+              cy="110"
+              r={(ring / 100) * 90}
+              fill="none"
               stroke="#d1d5db"
               strokeWidth="1"
             />
-          );
-        })}
+          ))}
 
-        <polygon
-          points={teamPoints.join(" ")}
-          fill="rgba(59,130,246,0.18)"
-          stroke="#3b82f6"
-          strokeWidth="2"
-        />
+          {data.map((d, i) => {
+            const angle = (Math.PI * 2 * i) / data.length - Math.PI / 2;
+            const x = 110 + Math.cos(angle) * 90;
+            const y = 110 + Math.sin(angle) * 90;
+            return (
+              <line
+                key={d.exercise}
+                x1="110"
+                y1="110"
+                x2={x}
+                y2={y}
+                stroke="#d1d5db"
+                strokeWidth="1"
+              />
+            );
+          })}
 
-        <polygon
-          points={points.join(" ")}
-          fill="rgba(16,185,129,0.18)"
-          stroke="#10b981"
-          strokeWidth="2"
-        />
-      </svg>
+          <polygon
+            points={teamPoints.join(" ")}
+            fill="rgba(59,130,246,0.18)"
+            stroke="#3b82f6"
+            strokeWidth="2"
+          />
+
+          <polygon
+            points={points.join(" ")}
+            fill="rgba(16,185,129,0.18)"
+            stroke="#10b981"
+            strokeWidth="2"
+          />
+        </svg>
+      </div>
 
       <div className="mt-3 space-y-1 text-sm">
         {data.map((d) => (
@@ -223,6 +235,9 @@ export default function PlayerReportPage({
     <main className="min-h-screen p-6 print:p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
+          <Link href="/" className="text-blue-600 hover:underline mb-2 block print:hidden">
+            ← Till Dashboard
+          </Link>
           <h1 className="text-2xl font-semibold">Spelarrapport</h1>
           {data && (
             <>
@@ -237,7 +252,7 @@ export default function PlayerReportPage({
 
         <div className="print:hidden flex gap-2">
           <button
-            className="border rounded px-3 py-1"
+            className="border rounded px-4 py-2 hover:bg-gray-50 transition-colors"
             onClick={() => window.print()}
           >
             Skriv ut / Spara PDF
@@ -277,7 +292,7 @@ export default function PlayerReportPage({
               <div className="text-3xl font-bold mt-1">
                 {data.totalStatus ?? "–"}
               </div>
-              <div className="mt-2">
+              <div className="mt-2 font-medium">
                 Trend: {trendSymbol} ({data.trend.delta >= 0 ? "+" : ""}
                 {data.trend.delta})
               </div>
@@ -298,6 +313,9 @@ export default function PlayerReportPage({
                     </div>
                   </div>
                 ))}
+                {data.strengths.length === 0 && (
+                  <p className="text-sm opacity-50 italic">Inga specifika styrkor noterade.</p>
+                )}
               </div>
             </div>
 
@@ -313,17 +331,20 @@ export default function PlayerReportPage({
                     </div>
                   </div>
                 ))}
+                {data.focus.length === 0 && (
+                  <p className="text-sm opacity-50 italic">Inga specifika fokusområden noterade.</p>
+                )}
               </div>
             </div>
           </div>
 
-          <div className="mt-6 border rounded-xl p-4">
+          <div className="mt-6 border rounded-xl p-4 print:hidden">
             <h3 className="font-semibold mb-3">Trend över tid</h3>
 
             <div className="mb-4">
               <label className="block text-sm mb-1">Välj övning</label>
               <select
-                className="border rounded px-3 py-2 w-full max-w-md"
+                className="border rounded px-3 py-2 w-full max-w-md bg-white"
                 value={selectedExerciseId}
                 onChange={(e) => setSelectedExerciseId(e.target.value)}
               >
@@ -340,56 +361,78 @@ export default function PlayerReportPage({
                 Ingen historik finns ännu för vald övning.
               </p>
             ) : (
-              <div className="space-y-2 text-sm">
-                {trendData.map((point) => (
-                  <div
-                    key={point.id}
-                    className="flex justify-between border-b pb-2"
-                  >
-                    <span>{point.date}</span>
-                    <span>
-                      {point.value}
-                      {point.unit ? ` ${point.unit}` : ""}
-                    </span>
-                  </div>
-                ))}
+              <div>
+                <div className="mb-4 text-sm opacity-80">
+                  Antal mätpunkter: {trendData.length}
+                  {trendData[0]?.unit ? ` • Enhet: ${trendData[0].unit}` : ""}
+                </div>
+
+                <div className="h-72 w-full min-h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={300}>
+                    <LineChart data={trendData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="date" 
+                        tickFormatter={(str) => new Date(str).toLocaleDateString("sv-SE", { month: "short", day: "numeric" })}
+                      />
+                      <YAxis />
+                      <Tooltip
+                        labelFormatter={(label) => new Date(label).toLocaleDateString("sv-SE", { year: "numeric", month: "long", day: "numeric" })}
+                        formatter={(value) => {
+                          const unit = trendData[0]?.unit;
+                          return unit
+                            ? [`${value} ${unit}`, "Värde"]
+                            : [value, "Värde"];
+                        }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="value"
+                        stroke="#2563eb"
+                        strokeWidth={2}
+                        dot={{ r: 4 }}
+                        activeDot={{ r: 6 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             )}
           </div>
 
-          <div className="mt-6">
+          <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             <RadarMini data={data.radar} />
-          </div>
 
-          <div className="mt-6 border rounded-xl p-4">
-            <h3 className="font-semibold mb-3">Detaljer per övning</h3>
-            <div className="overflow-x-auto">
-              <table className="min-w-[800px] border-collapse">
-                <thead>
-                  <tr className="text-left border-b">
-                    <th className="py-2">Övning</th>
-                    <th>Senaste råvärde</th>
-                    <th>Score</th>
-                    <th>Delta</th>
-                    <th>Median</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.table.map((row) => (
-                    <tr key={row.exerciseId} className="border-b">
-                      <td className="py-2">{row.exercise}</td>
-                      <td>{row.latestRaw ?? "-"}</td>
-                      <td>{row.latestScore ?? "-"}</td>
-                      <td>
-                        {row.deltaScore == null
-                          ? "-"
-                          : `${row.deltaScore >= 0 ? "+" : ""}${row.deltaScore}`}
-                      </td>
-                      <td>{row.teamScore ?? "-"}</td>
+            <div className="border rounded-xl p-4">
+              <h3 className="font-semibold mb-3">Detaljer per övning</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="text-left border-b">
+                      <th className="py-2 pr-4">Övning</th>
+                      <th className="px-2 text-right">Råvärde</th>
+                      <th className="px-2 text-right">Score</th>
+                      <th className="px-2 text-right">Delta</th>
+                      <th className="pl-2 text-right">Median</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {data.table.map((row) => (
+                      <tr key={row.exerciseId} className="border-b hover:bg-gray-50 transition-colors">
+                        <td className="py-2 pr-4 font-medium">{row.exercise}</td>
+                        <td className="px-2 text-right">{row.latestRaw ?? "-"}</td>
+                        <td className="px-2 text-right">{row.latestScore ?? "-"}</td>
+                        <td className="px-2 text-right">
+                          {row.deltaScore == null
+                            ? "-"
+                            : `${row.deltaScore >= 0 ? "+" : ""}${row.deltaScore}`}
+                        </td>
+                        <td className="pl-2 text-right">{row.teamScore ?? "-"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </>
