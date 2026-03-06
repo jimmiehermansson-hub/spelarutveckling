@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 type DashboardRow = {
@@ -138,7 +139,14 @@ export default function HomePage() {
             {rows.map((r) => (
               <tr key={r.player.id} className="border-b">
                 <td className="py-2">
-                  <div className="font-medium">{r.player.name}</div>
+                  <div className="font-medium">
+                    <Link
+                      className="underline"
+                      href={`/players/${r.player.id}`}
+                    >
+                      {r.player.name}
+                    </Link>
+                  </div>
                   <div className="text-xs opacity-70">
                     {r.player.primaryPosition ?? "-"}
                   </div>
