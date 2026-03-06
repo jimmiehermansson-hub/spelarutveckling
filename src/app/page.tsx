@@ -1,65 +1,180 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useEffect, useMemo, useState } from "react";
+
+type DashboardRow = {
+  player: { id: string; name: string; primaryPosition?: string | null };
+  lastTestDate: string | null;
+  totalStatus: number | null;
+  insufficientData: boolean;
+  trend: { direction: "UP" | "DOWN" | "NEUTRAL"; delta: number };
+  strengths: { exercise: string; score: number; raw: number }[];
+  focus: { exercise: string; score: number; raw: number }[];
+};
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+function daysAgoISO(n: number) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().slice(0, 10);
+}
+
+export default function HomePage() {
+  // För MVP: vi hämtar första teamet automatiskt
+  const [teamId, setTeamId] = useState<string | null>(null);
+  const [start, setStart] = useState(daysAgoISO(60));
+  const [end, setEnd] = useState(todayISO());
+  const [rows, setRows] = useState<DashboardRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Hämta teamId
+  useEffect(() => {
+    (async () => {
+      const res = await fetch("/api/teams");
+      const teams = await res.json();
+      if (teams?.[0]?.id) setTeamId(teams[0].id);
+    })();
+  }, []);
+
+  const summary = useMemo(() => {
+    const total = rows.length;
+    const withData = rows.filter((r) => !r.insufficientData).length;
+    const lastDates = rows
+      .map((r) => r.lastTestDate)
+      .filter(Boolean) as string[];
+    const last = lastDates.sort().slice(-1)[0] ?? null;
+    return { total, withData, last };
+  }, [rows]);
+
+  useEffect(() => {
+    if (!teamId) return;
+
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(
+          `/api/dashboard/players?teamId=${teamId}&start=${start}&end=${end}`,
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as DashboardRow[];
+        setRows(data);
+      } catch (e: any) {
+        setError(e?.message ?? "Unknown error");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [teamId, start, end]);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="min-h-screen p-6">
+      <h1 className="text-2xl font-semibold">Spelarutveckling – Dashboard</h1>
+
+      <div className="mt-4 flex flex-wrap items-end gap-3">
+        <div>
+          <label className="block text-sm opacity-80">Period start</label>
+          <input
+            className="border rounded px-2 py-1"
+            type="date"
+            value={start}
+            onChange={(e) => setStart(e.target.value)}
+          />
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <div>
+          <label className="block text-sm opacity-80">Period slut</label>
+          <input
+            className="border rounded px-2 py-1"
+            type="date"
+            value={end}
+            onChange={(e) => setEnd(e.target.value)}
+          />
         </div>
-      </main>
-    </div>
+        <button
+          className="border rounded px-3 py-1"
+          onClick={() => {
+            setStart(daysAgoISO(28));
+            setEnd(todayISO());
+          }}
+        >
+          Senaste 4 veckor
+        </button>
+        <button
+          className="border rounded px-3 py-1"
+          onClick={() => {
+            setStart(daysAgoISO(90));
+            setEnd(todayISO());
+          }}
+        >
+          Senaste 3 månader
+        </button>
+      </div>
+
+      <div className="mt-4 text-sm">
+        <span>Antal spelare: {summary.total}</span>
+        <span className="ml-4">Tillräcklig data: {summary.withData}</span>
+        <span className="ml-4">Senaste test: {summary.last ?? "-"}</span>
+      </div>
+
+      {loading && <p className="mt-4">Laddar…</p>}
+      {error && <p className="mt-4 text-red-600">Fel: {error}</p>}
+
+      <div className="mt-4 overflow-x-auto">
+        <table className="min-w-[900px] border-collapse">
+          <thead>
+            <tr className="text-left border-b">
+              <th className="py-2">Spelare</th>
+              <th>Total</th>
+              <th>Trend</th>
+              <th>Styrkor</th>
+              <th>Fokus</th>
+              <th>Senast testad</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.player.id} className="border-b">
+                <td className="py-2">
+                  <div className="font-medium">{r.player.name}</div>
+                  <div className="text-xs opacity-70">
+                    {r.player.primaryPosition ?? "-"}
+                  </div>
+                </td>
+                <td className="font-semibold">
+                  {r.totalStatus == null ? "–" : r.totalStatus}
+                </td>
+                <td>
+                  {r.trend.direction === "UP"
+                    ? "↑"
+                    : r.trend.direction === "DOWN"
+                      ? "↓"
+                      : "→"}{" "}
+                  ({r.trend.delta >= 0 ? "+" : ""}
+                  {r.trend.delta})
+                </td>
+                <td className="text-sm">
+                  {r.strengths.map((s) => (
+                    <div key={s.exercise}>
+                      {s.exercise}: {s.score}
+                    </div>
+                  ))}
+                </td>
+                <td className="text-sm">
+                  {r.focus.map((f) => (
+                    <div key={f.exercise}>
+                      {f.exercise}: {f.score}
+                    </div>
+                  ))}
+                </td>
+                <td>{r.lastTestDate ?? "-"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </main>
   );
 }
