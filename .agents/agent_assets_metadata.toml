@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "ybbxmlBeEaKRfeN-80Vkc"
+uri = "file://spelarutveckling.tar.gz"
+type = "unspecified"
+title = "Spelarutveckling — full source code"
